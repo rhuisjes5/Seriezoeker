@@ -1,4 +1,4 @@
-const CACHE = 'seriezoeker-v11';
+const CACHE = 'seriezoeker-v12';
 const FILES = ['./', './index.html', './styles.css', './qr-decoder.js', './app.js', './manifest.webmanifest', './icon.svg'];
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(FILES)));

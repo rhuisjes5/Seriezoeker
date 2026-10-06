@@ -21,14 +21,24 @@ let pendingPairing = null;
 const scannerCanvas = document.createElement('canvas');
 const scannerContext = scannerCanvas.getContext('2d', { willReadFrequently: true });
 
+function isEndedSeries(tmdbInfo) {
+  const status = String(tmdbInfo?.status || '').toLocaleLowerCase();
+  return status.includes('ended') || status.includes('cancel') || tmdbInfo?.in_production === false;
+}
+
 function readQueue() {
   try {
     const value = JSON.parse(localStorage.getItem(QUEUE_STORAGE) || '[]');
     if (!Array.isArray(value)) return [];
     let migrated = false;
     for (const item of value) {
+      if (!item || typeof item !== 'object') continue;
       if (/^https:\/\/image\.tmdb\.org\/t\/p\/w\d+\//i.test(item.image_path || '')) {
         item.image_path = '';
+        migrated = true;
+      }
+      if (isEndedSeries(item.tmdb_info) && item.status !== '2') {
+        item.status = '2';
         migrated = true;
       }
     }
@@ -178,7 +188,7 @@ async function addShow(id) {
     image_path: '',
     poster_path: show.poster_path || '',
     tvdb,
-    status: '0',
+    status: isEndedSeries(tmdbInfo) ? '2' : '0',
     next_air_date: 'Nog niet bekend',
     tmdb_id: show.id,
     tmdb_info: tmdbInfo,
@@ -202,6 +212,34 @@ function exportQueue() {
   setStatus(`${queue.length} ${queue.length === 1 ? 'serie geëxporteerd' : 'series geëxporteerd'}.`, 'success');
 }
 
+async function refreshQueuedTmdbStatus() {
+  const key = getKey();
+  if (!key) return;
+  for (const show of queue) {
+    if (!show.tmdb_id || show.tmdb_info) {
+      if (isEndedSeries(show.tmdb_info)) show.status = '2';
+      continue;
+    }
+    try {
+      const url = new URL(`${API_ROOT}/tv/${show.tmdb_id}`);
+      url.searchParams.set('api_key', key);
+      url.searchParams.set('language', 'nl-NL');
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const details = await response.json();
+      show.tmdb_info = {
+        status: details.status,
+        in_production: details.in_production,
+        last_air_date: details.last_air_date,
+        next_episode_to_air: details.next_episode_to_air,
+        seasons: (details.seasons || []).map(({ season_number }) => ({ season_number })),
+      };
+      if (isEndedSeries(show.tmdb_info)) show.status = '2';
+    } catch { /* Keep the saved status if TMDB is unavailable. */ }
+  }
+  localStorage.setItem(QUEUE_STORAGE, JSON.stringify(queue));
+}
+
 async function sendQueueToManager() {
   const token = localStorage.getItem(BRIDGE_STORAGE) || '';
   const bridgeUrl = localStorage.getItem(BRIDGE_URL_STORAGE) || '';
@@ -209,6 +247,7 @@ async function sendQueueToManager() {
   ui.sendButton.disabled = true;
   ui.sendButton.textContent = 'Versturen…';
   try {
+    await refreshQueuedTmdbStatus();
     const response = await fetch(new URL('/api/import', bridgeUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
