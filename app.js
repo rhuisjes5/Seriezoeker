@@ -1,5 +1,6 @@
 const API_ROOT = 'https://api.themoviedb.org/3';
 const IMAGE_ROOT = 'https://image.tmdb.org/t/p/w342';
+const TMDB_IMAGE_ROOT = 'https://image.tmdb.org/t/p';
 const FORMAT = 'serie-manager-mobile';
 const KEY_STORAGE = 'seriezoeker.tmdb-key.v1';
 const QUEUE_STORAGE = 'seriezoeker.queue.v1';
@@ -149,7 +150,10 @@ async function addShow(id) {
   queue.push({
     serie: show.name || show.original_name || '',
     start_jaar: show.first_air_date?.slice(0, 4) || '',
-    image_path: show.poster_path ? `${IMAGE_ROOT}${show.poster_path}` : '',
+    image_path: show.backdrop_path
+      ? `${TMDB_IMAGE_ROOT}/w1280${show.backdrop_path}`
+      : show.poster_path ? `${TMDB_IMAGE_ROOT}/w500${show.poster_path}` : '',
+    poster_path: show.poster_path || '',
     tvdb,
     status: '0',
     next_air_date: 'Nog niet bekend',
