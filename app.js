@@ -26,6 +26,13 @@ function isEndedSeries(tmdbInfo) {
   return status.includes('ended') || status.includes('cancel') || tmdbInfo?.in_production === false;
 }
 
+function tvdbSeriesUrl(seriesName) {
+  const slug = String(seriesName || '').toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug
+    ? `https://thetvdb.com/series/${slug}`
+    : `https://thetvdb.com/search?query=${encodeURIComponent(seriesName || '')}`;
+}
+
 function readQueue() {
   try {
     const value = JSON.parse(localStorage.getItem(QUEUE_STORAGE) || '[]');
@@ -35,6 +42,10 @@ function readQueue() {
       if (!item || typeof item !== 'object') continue;
       if (/^https:\/\/image\.tmdb\.org\/t\/p\/w\d+\//i.test(item.image_path || '')) {
         item.image_path = '';
+        migrated = true;
+      }
+      if (/^https:\/\/thetvdb\.com\/series\/\d+\/?$/i.test(item.tvdb || '')) {
+        item.tvdb = tvdbSeriesUrl(item.serie);
         migrated = true;
       }
       if (isEndedSeries(item.tmdb_info) && item.status !== '2') {
@@ -155,17 +166,9 @@ async function searchShows(event) {
 async function addShow(id) {
   const show = results.find((item) => String(item.id) === String(id));
   if (!show || queue.some((item) => Number(item.tmdb_id) === Number(show.id))) return;
-  let tvdb = `https://thetvdb.com/search?query=${encodeURIComponent(show.name || '')}`;
+  const seriesName = show.name || show.original_name || '';
+  const tvdb = tvdbSeriesUrl(seriesName);
   let tmdbInfo = null;
-  try {
-    const url = new URL(`${API_ROOT}/tv/${show.id}/external_ids`);
-    url.searchParams.set('api_key', getKey());
-    const response = await fetch(url);
-    if (response.ok) {
-      const external = await response.json();
-      if (external.tvdb_id) tvdb = `https://thetvdb.com/series/${encodeURIComponent(external.tvdb_id)}`;
-    }
-  } catch { /* Keep the TVDB search link. */ }
   try {
     const url = new URL(`${API_ROOT}/tv/${show.id}`);
     url.searchParams.set('api_key', getKey());
@@ -183,7 +186,7 @@ async function addShow(id) {
     }
   } catch { /* Folder setup can use the default ongoing-series template. */ }
   queue.push({
-    serie: show.name || show.original_name || '',
+    serie: seriesName,
     start_jaar: show.first_air_date?.slice(0, 4) || '',
     image_path: '',
     poster_path: show.poster_path || '',

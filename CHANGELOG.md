@@ -11,6 +11,8 @@
 ### 🔧 Verbeteringen en fixes
 - **Lokale verbinding met Serie Manager**: De PWA controleert de pairing-token via de HTTPS-bridge. Rechtstreeks versturen werkt wanneer telefoon en pc op hetzelfde netwerk zitten en Serie Manager draait.
 - **TVDB-banners behouden**: De PWA gebruikt TMDB-posters alleen voor thumbnails en laat `Afbeelding` leeg bij import. Oude TMDB-afbeeldingslinks in de nog niet verstuurde telefoonlijst worden verwijderd.
+- **TVDB-serielinks gebruiken slugs**: Links gebruiken nu de serienaam in het URL-pad, bijvoorbeeld `/series/beverly-hills-90210`, in plaats van een numeriek ID dat een 404 gaf. Bestaande wachtrijlinks worden automatisch omgezet.
 - **Duidelijkere verbindingsfout**: Een mislukte verbinding noemt nu de belangrijkste controles voor lokaal netwerk, certificaat, wifi en Windows Firewall.
 - **Lokale QR-decoder offline beschikbaar**: jsQR 1.4.0 is gebundeld onder Apache-2.0; de licentie staat in `qr-decoder-LICENSE.txt`.
 - **Beëindigde series krijgen status 2**: De PWA zet nieuwe en eerder bewaarde wachtrij-items op status `2` op basis van TMDB-status en `in_production`. Ontbrekende TMDB-details worden vóór verzending opgehaald; de bridge corrigeert ook bestaande records.
+- **Status direct zichtbaar in Serie Manager**: De desktopapp ververst na import onmiddellijk de geopende serie en de serielijst; wisselen van serie is niet meer nodig.
