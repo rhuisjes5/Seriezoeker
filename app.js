@@ -1,6 +1,5 @@
 const API_ROOT = 'https://api.themoviedb.org/3';
 const IMAGE_ROOT = 'https://image.tmdb.org/t/p/w342';
-const TMDB_IMAGE_ROOT = 'https://image.tmdb.org/t/p';
 const FORMAT = 'serie-manager-mobile';
 const KEY_STORAGE = 'seriezoeker.tmdb-key.v1';
 const QUEUE_STORAGE = 'seriezoeker.queue.v1';
@@ -25,7 +24,16 @@ const scannerContext = scannerCanvas.getContext('2d', { willReadFrequently: true
 function readQueue() {
   try {
     const value = JSON.parse(localStorage.getItem(QUEUE_STORAGE) || '[]');
-    return Array.isArray(value) ? value : [];
+    if (!Array.isArray(value)) return [];
+    let migrated = false;
+    for (const item of value) {
+      if (/^https:\/\/image\.tmdb\.org\/t\/p\/w\d+\//i.test(item.image_path || '')) {
+        item.image_path = '';
+        migrated = true;
+      }
+    }
+    if (migrated) localStorage.setItem(QUEUE_STORAGE, JSON.stringify(value));
+    return value;
   } catch { return []; }
 }
 
@@ -150,9 +158,7 @@ async function addShow(id) {
   queue.push({
     serie: show.name || show.original_name || '',
     start_jaar: show.first_air_date?.slice(0, 4) || '',
-    image_path: show.backdrop_path
-      ? `${TMDB_IMAGE_ROOT}/w1280${show.backdrop_path}`
-      : show.poster_path ? `${TMDB_IMAGE_ROOT}/w500${show.poster_path}` : '',
+    image_path: '',
     poster_path: show.poster_path || '',
     tvdb,
     status: '0',

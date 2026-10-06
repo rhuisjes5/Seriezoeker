@@ -32,4 +32,4 @@ De site en bronbestanden van deze aparte repository zijn openbaar. Er staat geen
 
 ## Naar Serie Manager
 
-Na het koppelen kies je `Verstuur direct naar Serie Manager`. Nieuwe series worden toegevoegd; bestaande records worden overgeslagen. `Exporteer JSON` en `Importeer telefoonlijst` blijven beschikbaar als fallback.
+Na het koppelen kies je `Verstuur direct naar Serie Manager`. Nieuwe series worden toegevoegd; bestaande records worden overgeslagen. De PWA gebruikt TMDB-posters alleen als thumbnails en laat het veld `Afbeelding` leeg, zodat Serie Manager je TVDB-banner niet door een TMDB-still vervangt. `Exporteer JSON` en `Importeer telefoonlijst` blijven beschikbaar als fallback.
