@@ -146,6 +146,7 @@ async function addShow(id) {
   const show = results.find((item) => String(item.id) === String(id));
   if (!show || queue.some((item) => Number(item.tmdb_id) === Number(show.id))) return;
   let tvdb = `https://thetvdb.com/search?query=${encodeURIComponent(show.name || '')}`;
+  let tmdbInfo = null;
   try {
     const url = new URL(`${API_ROOT}/tv/${show.id}/external_ids`);
     url.searchParams.set('api_key', getKey());
@@ -155,6 +156,22 @@ async function addShow(id) {
       if (external.tvdb_id) tvdb = `https://thetvdb.com/series/${encodeURIComponent(external.tvdb_id)}`;
     }
   } catch { /* Keep the TVDB search link. */ }
+  try {
+    const url = new URL(`${API_ROOT}/tv/${show.id}`);
+    url.searchParams.set('api_key', getKey());
+    url.searchParams.set('language', 'nl-NL');
+    const response = await fetch(url);
+    if (response.ok) {
+      const details = await response.json();
+      tmdbInfo = {
+        status: details.status,
+        in_production: details.in_production,
+        last_air_date: details.last_air_date,
+        next_episode_to_air: details.next_episode_to_air,
+        seasons: (details.seasons || []).map(({ season_number }) => ({ season_number })),
+      };
+    }
+  } catch { /* Folder setup can use the default ongoing-series template. */ }
   queue.push({
     serie: show.name || show.original_name || '',
     start_jaar: show.first_air_date?.slice(0, 4) || '',
@@ -164,6 +181,7 @@ async function addShow(id) {
     status: '0',
     next_air_date: 'Nog niet bekend',
     tmdb_id: show.id,
+    tmdb_info: tmdbInfo,
   });
   renderQueue();
   setStatus(`${show.name} staat op je importlijst.`, 'success');
