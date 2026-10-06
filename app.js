@@ -7,7 +7,7 @@ const BRIDGE_STORAGE = 'seriezoeker.manager-token.v1';
 const BRIDGE_URL_STORAGE = 'seriezoeker.manager-url.v1';
 
 const ui = Object.fromEntries([
-  'searchForm searchInput searchButton statusLine resultsList resultCount resultsEmpty queueList queueCount queueEmpty sendButton exportButton clearButton settingsPanel settingsButton closeSettings apiKeyInput saveKeyButton forgetKeyButton installButton scanPairButton pairScannerDialog pairScannerVideo scannerMessage closeScannerButton cancelScannerButton'
+  'searchForm searchInput searchButton statusLine resultsList resultCount resultsEmpty queueList queueCount queueEmpty sendButton exportButton clearButton settingsPanel settingsButton closeSettings apiKeyInput saveKeyButton forgetKeyButton installButton scanPairButton pairScannerDialog pairScannerVideo scannerMessage connectScannerButton closeScannerButton cancelScannerButton'
 ].join(' ').split(' ').map((id) => [id, document.getElementById(id)]));
 
 let queue = readQueue();
@@ -17,6 +17,7 @@ let scannerStream = null;
 let scannerFrame = 0;
 let scannerActive = false;
 let scannerRequest = 0;
+let pendingPairing = null;
 const scannerCanvas = document.createElement('canvas');
 const scannerContext = scannerCanvas.getContext('2d', { willReadFrequently: true });
 
@@ -30,6 +31,13 @@ function readQueue() {
 function setStatus(text, tone = '') {
   ui.statusLine.textContent = text;
   ui.statusLine.dataset.tone = tone;
+}
+
+function bridgeErrorMessage(error) {
+  if (error instanceof TypeError || /failed to fetch|networkerror/i.test(error.message || '')) {
+    return 'Chrome kan de pc niet bereiken. Sta lokaal-netwerktoegang toe voor deze site en controleer of het CA-certificaat is geïnstalleerd, beide apparaten op hetzelfde wifi zitten, Serie Manager open is en Windows Firewall de verbinding toestaat.';
+  }
+  return error.message || 'Serie Manager is niet bereikbaar. Controleer wifi en koppel opnieuw.';
 }
 
 function esc(value) {
@@ -188,7 +196,7 @@ async function sendQueueToManager() {
     renderQueue();
     setStatus(`${(result.imported || []).length} toegevoegd; ${(result.skipped || []).length} bestond al in Serie Manager.`, 'success');
   } catch (error) {
-    setStatus(error.message || 'Serie Manager is niet bereikbaar. Controleer wifi en koppel opnieuw.', 'error');
+    setStatus(bridgeErrorMessage(error), 'error');
   } finally {
     ui.sendButton.textContent = 'Verstuur direct naar Serie Manager';
     ui.sendButton.disabled = queue.length === 0;
@@ -206,11 +214,14 @@ async function connectPairingToken(token, bridgeUrl = location.origin) {
     localStorage.setItem(BRIDGE_URL_STORAGE, new URL(bridgeUrl).origin);
     ui.sendButton.hidden = false;
     setStatus('Verbonden met Serie Manager op dit wifi-netwerk.', 'success');
+    if (ui.pairScannerDialog.open) ui.pairScannerDialog.close();
   } catch (error) {
     localStorage.removeItem(BRIDGE_STORAGE);
     localStorage.removeItem(BRIDGE_URL_STORAGE);
     ui.sendButton.hidden = true;
-    setStatus(error.message, 'error');
+    const message = bridgeErrorMessage(error);
+    setStatus(message, 'error');
+    if (ui.pairScannerDialog.open) ui.scannerMessage.textContent = message;
   }
 }
 
@@ -240,6 +251,14 @@ function readPairingQr(value) {
   return { token, origin: pairingUrl.origin };
 }
 
+function showPairingConfirmation(value) {
+  pendingPairing = readPairingQr(value);
+  stopPairingScan();
+  ui.scannerMessage.textContent = 'QR herkend. Tik op Verbinden en sta toegang tot je lokale netwerk toe.';
+  ui.connectScannerButton.hidden = false;
+  ui.connectScannerButton.focus();
+}
+
 async function scanPairingFrame() {
   if (!scannerActive || ui.pairScannerVideo.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
     if (scannerActive) scannerFrame = setTimeout(scanPairingFrame, 120);
@@ -254,10 +273,7 @@ async function scanPairingFrame() {
     const pixels = scannerContext.getImageData(0, 0, scannerCanvas.width, scannerCanvas.height);
     const result = window.jsQR(pixels.data, pixels.width, pixels.height, { inversionAttempts: 'attemptBoth' });
     if (result?.data) {
-      const pairing = readPairingQr(result.data);
-      stopPairingScan();
-      ui.pairScannerDialog.close();
-      await connectPairingToken(pairing.token, pairing.origin);
+      showPairingConfirmation(result.data);
       return;
     }
   } catch (error) {
@@ -329,9 +345,21 @@ ui.forgetKeyButton.addEventListener('click', () => {
 ui.exportButton.addEventListener('click', exportQueue);
 ui.sendButton.addEventListener('click', sendQueueToManager);
 ui.scanPairButton.addEventListener('click', startPairingScan);
+ui.connectScannerButton.addEventListener('click', async () => {
+  if (!pendingPairing) return;
+  ui.connectScannerButton.disabled = true;
+  ui.connectScannerButton.textContent = 'Verbinden…';
+  await connectPairingToken(pendingPairing.token, pendingPairing.origin);
+  ui.connectScannerButton.disabled = false;
+  ui.connectScannerButton.textContent = 'Verbinden met Serie Manager';
+});
 ui.closeScannerButton.addEventListener('click', () => ui.pairScannerDialog.close());
 ui.cancelScannerButton.addEventListener('click', () => ui.pairScannerDialog.close());
-ui.pairScannerDialog.addEventListener('close', stopPairingScan);
+ui.pairScannerDialog.addEventListener('close', () => {
+  stopPairingScan();
+  pendingPairing = null;
+  ui.connectScannerButton.hidden = true;
+});
 ui.clearButton.addEventListener('click', () => {
   if (!queue.length || !confirm('De volledige importlijst wissen?')) return;
   queue = [];
