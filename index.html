@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17221f">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Seriezoeker</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Seriezoeker start"><span class="brand-mark">S</span><span class="brand-name">SERIE<span>ZOEKER</span></span></a>
+      <div class="top-actions">
+        <button class="icon-button" id="scanPairButton" type="button" title="Scan koppel-QR">Scan QR</button>
+        <button class="icon-button" id="installButton" type="button" hidden>Installeren</button>
+        <button class="icon-button" id="settingsButton" type="button" aria-expanded="false" aria-controls="settingsPanel">Instellingen</button>
+      </div>
+    </header>
+    <dialog class="scanner-dialog" id="pairScannerDialog" aria-labelledby="scannerTitle">
+      <div class="scanner-heading"><div><p class="eyebrow">SERIE MANAGER KOPPELEN</p><h2 id="scannerTitle">Scan de QR-code</h2></div><button class="icon-only" id="closeScannerButton" type="button" aria-label="Scanner sluiten">×</button></div>
+      <div class="scanner-view"><video id="pairScannerVideo" muted playsinline></video><span class="scanner-frame" aria-hidden="true"></span></div>
+      <p class="scanner-message" id="scannerMessage" role="status" aria-live="polite">Camera starten…</p>
+      <button class="button button-dark scanner-close" id="cancelScannerButton" type="button">Annuleren</button>
+    </dialog>
+    <section class="intro">
+      <p class="eyebrow">MOBIELE SERIECATALOGUS</p>
+      <h1>Wat wil je<br><em>gaan volgen?</em></h1>
+      <p class="intro-copy">Zoek een serie, zet hem op je lijst en neem de selectie mee naar Serie Manager.</p>
+    </section>
+    <section class="settings-panel" id="settingsPanel" hidden>
+      <div class="settings-heading"><div><p class="eyebrow">EENMALIG INSTELLEN</p><h2>TMDB-verbinding</h2></div><button class="icon-only" id="closeSettings" type="button" aria-label="Instellingen sluiten">×</button></div>
+      <label for="apiKeyInput">TMDB API-sleutel</label>
+      <div class="key-row"><input id="apiKeyInput" type="password" autocomplete="off" placeholder="Plak je TMDB API-sleutel"><button class="button button-dark" id="saveKeyButton" type="button">Bewaar</button></div>
+      <p class="hint">De sleutel blijft alleen in deze browser op je telefoon. Hij staat niet in het exportbestand.</p>
+      <button class="text-button" id="forgetKeyButton" type="button">Sleutel wissen</button>
+    </section>
+    <section class="search-section" aria-label="Series zoeken">
+      <form class="search-form" id="searchForm"><label class="sr-only" for="searchInput">Serienaam</label><span class="search-symbol" aria-hidden="true"></span><input id="searchInput" type="search" placeholder="Zoek op serienaam" enterkeyhint="search" autocomplete="off"><button class="button button-accent" id="searchButton" type="submit">Zoek</button></form>
+      <div class="status-line" id="statusLine" role="status" aria-live="polite">Vul je TMDB-sleutel in via Instellingen om te zoeken.</div>
+    </section>
+    <section class="content-grid">
+      <section class="results-section" aria-labelledby="resultsTitle"><div class="section-heading"><div><p class="eyebrow">ONTDEKKEN</p><h2 id="resultsTitle">Zoekresultaten</h2></div><span class="count-label" id="resultCount">0</span></div><div class="results-list" id="resultsList"><div class="empty-state" id="resultsEmpty"><span class="empty-index">01</span><p>Zoek een serie om resultaten te bekijken.</p></div></div></section>
+      <aside class="queue-section" aria-labelledby="queueTitle"><div class="section-heading"><div><p class="eyebrow">BEWAARD OP DIT APPARAAT</p><h2 id="queueTitle">Importlijst</h2></div><span class="count-label count-accent" id="queueCount">0</span></div><div class="queue-list" id="queueList"></div><div class="queue-empty" id="queueEmpty"><span class="queue-dash"></span><p>Je lijst is nog leeg.</p></div><div class="export-area"><button class="button button-export" id="sendButton" type="button" disabled hidden>Verstuur direct naar Serie Manager</button><button class="button button-export" id="exportButton" type="button" disabled><span>Exporteer JSON</span><span aria-hidden="true">↓</span></button><button class="text-button clear-button" id="clearButton" type="button" hidden>Wis importlijst</button><p class="hint">Koppel via de QR in Serie Manager voor direct versturen, of exporteer JSON.</p></div></aside>
+    </section>
+    <footer class="footer"><span>TMDB-DATA</span><span class="footer-rule"></span><span>LOKALE IMPORTLIJST</span></footer>
+  </main>
+  <script src="./qr-decoder.js" defer></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>

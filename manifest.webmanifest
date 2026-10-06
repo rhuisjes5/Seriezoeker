@@ -1,0 +1,13 @@
+{
+  "name": "Seriezoeker voor Serie Manager",
+  "short_name": "Seriezoeker",
+  "description": "Zoek series op je telefoon en exporteer de selectie naar Serie Manager.",
+  "lang": "nl-NL",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f3ed",
+  "theme_color": "#17221f",
+  "icons": [{ "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
