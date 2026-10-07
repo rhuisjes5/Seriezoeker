@@ -54,6 +54,10 @@ function compactTmdbInfo(details) {
   } : null;
 }
 
+function overviewButton(text) {
+  return `<button class="detail-overview" type="button" data-toggle-overview aria-expanded="false" aria-label="Vergroot de beschrijving">${esc(text)}</button>`;
+}
+
 function tvdbSeriesUrl(seriesName) {
   const slug = String(seriesName || '').toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return slug
@@ -152,10 +156,10 @@ async function openShowDetails(id) {
       seasonCount ? `${seasonCount} seizoenen` : '',
       details.status || '',
     ].filter(Boolean);
-    ui.detailContent.innerHTML = `<div class="detail-layout">${poster(details.poster_path || show.poster_path, show.name, 'detail-poster')}<div class="detail-copy"><p class="detail-meta">${esc(facts.join(' · '))}</p><p>${esc(overview)}</p>${genres ? `<p><strong>Genres</strong><br>${esc(genres)}</p>` : ''}${networks ? `<p><strong>Zender / netwerk</strong><br>${esc(networks)}</p>` : ''}${details.tagline ? `<p class="detail-tagline">“${esc(details.tagline)}”</p>` : ''}</div></div>`;
+    ui.detailContent.innerHTML = `<div class="detail-layout">${poster(details.poster_path || show.poster_path, show.name, 'detail-poster')}<div class="detail-copy"><p class="detail-meta">${esc(facts.join(' · '))}</p>${overviewButton(overview)}${genres ? `<p><strong>Genres</strong><br>${esc(genres)}</p>` : ''}${networks ? `<p><strong>Zender / netwerk</strong><br>${esc(networks)}</p>` : ''}${details.tagline ? `<p class="detail-tagline">“${esc(details.tagline)}”</p>` : ''}</div></div>`;
   } catch {
     if (activeDetailId === String(id) && ui.detailDialog.open) {
-      ui.detailContent.innerHTML = `<div class="detail-layout">${poster(show.poster_path, show.name, 'detail-poster')}<p>${esc(show.overview || 'Extra seriegegevens zijn nu niet beschikbaar.')}</p></div>`;
+      ui.detailContent.innerHTML = `<div class="detail-layout">${poster(show.poster_path, show.name, 'detail-poster')}<div class="detail-copy">${overviewButton(show.overview || 'Extra seriegegevens zijn nu niet beschikbaar.')}</div></div>`;
     }
   }
 }
@@ -433,6 +437,13 @@ function closeSettings() {
 ui.searchForm.addEventListener('submit', searchShows);
 ui.closeDetailButton.addEventListener('click', () => ui.detailDialog.close());
 ui.detailDialog.addEventListener('close', () => { activeDetailId = null; });
+ui.detailContent.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-toggle-overview]');
+  if (!button) return;
+  const enlarged = button.classList.toggle('is-large');
+  button.setAttribute('aria-expanded', String(enlarged));
+  button.setAttribute('aria-label', enlarged ? 'Verklein de beschrijving' : 'Vergroot de beschrijving');
+});
 ui.detailAddButton.addEventListener('click', async () => {
   if (!activeDetailId || ui.detailAddButton.disabled) return;
   const id = activeDetailId;
