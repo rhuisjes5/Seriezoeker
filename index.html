@@ -7,6 +7,7 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./details.css">
   <title>Seriezoeker</title>
 </head>
 <body>
@@ -25,6 +26,11 @@
       <p class="scanner-message" id="scannerMessage" role="status" aria-live="polite">Camera starten…</p>
       <button class="button scanner-connect" id="connectScannerButton" type="button" hidden>Verbinden met Serie Manager</button>
       <button class="button button-dark scanner-close" id="cancelScannerButton" type="button">Annuleren</button>
+    </dialog>
+    <dialog class="detail-dialog" id="detailDialog" aria-labelledby="detailTitle">
+      <div class="detail-heading"><h2 id="detailTitle">Serie-informatie</h2><button class="icon-only" id="closeDetailButton" type="button" aria-label="Details sluiten">×</button></div>
+      <div class="detail-content" id="detailContent"></div>
+      <button class="button detail-add" id="detailAddButton" type="button">+ Lijst</button>
     </dialog>
     <section class="intro">
       <p class="eyebrow">MOBIELE SERIECATALOGUS</p>

@@ -7,7 +7,7 @@ const BRIDGE_STORAGE = 'seriezoeker.manager-token.v1';
 const BRIDGE_URL_STORAGE = 'seriezoeker.manager-url.v1';
 
 const ui = Object.fromEntries([
-  'searchForm searchInput searchButton statusLine resultsList resultCount resultsEmpty queueList queueCount queueEmpty sendButton exportButton clearButton settingsPanel settingsButton closeSettings apiKeyInput saveKeyButton forgetKeyButton installButton scanPairButton pairScannerDialog pairScannerVideo scannerMessage connectScannerButton closeScannerButton cancelScannerButton'
+  'searchForm searchInput searchButton statusLine resultsList resultCount resultsEmpty queueList queueCount queueEmpty sendButton exportButton clearButton settingsPanel settingsButton closeSettings apiKeyInput saveKeyButton forgetKeyButton installButton scanPairButton pairScannerDialog pairScannerVideo scannerMessage connectScannerButton closeScannerButton cancelScannerButton detailDialog detailTitle detailContent detailAddButton closeDetailButton'
 ].join(' ').split(' ').map((id) => [id, document.getElementById(id)]));
 
 let queue = readQueue();
@@ -18,12 +18,40 @@ let scannerFrame = 0;
 let scannerActive = false;
 let scannerRequest = 0;
 let pendingPairing = null;
+let activeDetailId = null;
+const detailCache = new Map();
 const scannerCanvas = document.createElement('canvas');
 const scannerContext = scannerCanvas.getContext('2d', { willReadFrequently: true });
 
 function isEndedSeries(tmdbInfo) {
   const status = String(tmdbInfo?.status || '').toLocaleLowerCase();
   return status.includes('ended') || status.includes('cancel') || tmdbInfo?.in_production === false;
+}
+
+function getTvDetails(id) {
+  if (!detailCache.has(String(id))) {
+    const request = (async () => {
+      const url = new URL(`${API_ROOT}/tv/${id}`);
+      url.searchParams.set('api_key', getKey());
+      url.searchParams.set('language', 'nl-NL');
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`TMDB gaf fout ${response.status}.`);
+      return response.json();
+    })();
+    detailCache.set(String(id), request);
+      request.catch(() => detailCache.delete(String(id)));
+  }
+  return detailCache.get(String(id));
+}
+
+function compactTmdbInfo(details) {
+  return details ? {
+    status: details.status,
+    in_production: details.in_production,
+    last_air_date: details.last_air_date,
+    next_episode_to_air: details.next_episode_to_air,
+    seasons: (details.seasons || []).map(({ season_number }) => ({ season_number })),
+  } : null;
 }
 
 function tvdbSeriesUrl(seriesName) {
@@ -48,8 +76,8 @@ function readQueue() {
         item.tvdb = tvdbSeriesUrl(item.serie);
         migrated = true;
       }
-      if (isEndedSeries(item.tmdb_info) && item.status !== '2') {
-        item.status = '2';
+      if (item.status !== '4') {
+        item.status = '4';
         migrated = true;
       }
     }
@@ -88,17 +116,48 @@ function renderResults() {
   }
   ui.resultsList.innerHTML = results.map((show, index) => {
     const year = show.first_air_date?.slice(0, 4) || 'Jaar onbekend';
-    const saved = queue.some((item) => Number(item.tmdb_id) === Number(show.id));
     return `<article class="result-card" style="animation-delay:${Math.min(index * 35, 210)}ms">
-      ${poster(show.poster_path, show.name)}
-      <div class="result-info"><h3 class="result-title">${esc(show.name)}</h3>
-        <p class="result-meta">${esc(year)}${show.original_name && show.original_name !== show.name ? ` · ${esc(show.original_name)}` : ''}</p>
-        <p class="result-overview">${esc(show.overview || 'Geen beschrijving beschikbaar.')}</p>
-      </div>
-      <button class="button add-button" type="button" data-add="${esc(show.id)}" ${saved ? 'disabled' : ''}>${saved ? 'Op lijst' : '+ Lijst'}</button>
+      <button class="result-detail" type="button" data-details="${esc(show.id)}" aria-label="Meer informatie over ${esc(show.name)}">
+        ${poster(show.poster_path, show.name)}
+        <span class="result-info"><span class="result-title">${esc(show.name)}</span>
+          <span class="result-meta">${esc(year)}${show.original_name && show.original_name !== show.name ? ` · ${esc(show.original_name)}` : ''}</span>
+          <span class="result-overview">${esc(show.overview || 'Geen beschrijving beschikbaar.')}</span>
+        </span>
+      </button>
     </article>`;
   }).join('');
-  ui.resultsList.querySelectorAll('[data-add]').forEach((button) => button.addEventListener('click', () => addShow(button.dataset.add)));
+  ui.resultsList.querySelectorAll('[data-details]').forEach((button) => button.addEventListener('click', () => openShowDetails(button.dataset.details)));
+}
+
+async function openShowDetails(id) {
+  const show = results.find((item) => String(item.id) === String(id));
+  if (!show) return;
+  activeDetailId = String(id);
+  ui.detailTitle.textContent = show.name || show.original_name || 'Serie-informatie';
+  ui.detailContent.innerHTML = '<p class="detail-loading">Seriegegevens laden…</p>';
+  const saved = queue.some((item) => Number(item.tmdb_id) === Number(show.id));
+  ui.detailAddButton.disabled = saved;
+  ui.detailAddButton.textContent = saved ? 'Op lijst' : '+ Lijst';
+  ui.detailDialog.showModal();
+  try {
+    const details = await getTvDetails(show.id);
+    if (activeDetailId !== String(id) || !ui.detailDialog.open) return;
+    const genres = (details.genres || []).map((genre) => genre.name).filter(Boolean).join(', ');
+    const networks = (details.networks || []).map((network) => network.name).filter(Boolean).join(', ');
+    const seasonCount = (details.seasons || []).filter((season) => season.season_number > 0).length;
+    const overview = details.overview || show.overview || 'Geen beschrijving beschikbaar.';
+    const facts = [
+      details.first_air_date?.slice(0, 4) || 'Jaar onbekend',
+      details.number_of_episodes ? `${details.number_of_episodes} afleveringen` : '',
+      seasonCount ? `${seasonCount} seizoenen` : '',
+      details.status || '',
+    ].filter(Boolean);
+    ui.detailContent.innerHTML = `<div class="detail-layout">${poster(details.poster_path || show.poster_path, show.name, 'detail-poster')}<div class="detail-copy"><p class="detail-meta">${esc(facts.join(' · '))}</p><p>${esc(overview)}</p>${genres ? `<p><strong>Genres</strong><br>${esc(genres)}</p>` : ''}${networks ? `<p><strong>Zender / netwerk</strong><br>${esc(networks)}</p>` : ''}${details.tagline ? `<p class="detail-tagline">“${esc(details.tagline)}”</p>` : ''}</div></div>`;
+  } catch {
+    if (activeDetailId === String(id) && ui.detailDialog.open) {
+      ui.detailContent.innerHTML = `<div class="detail-layout">${poster(show.poster_path, show.name, 'detail-poster')}<p>${esc(show.overview || 'Extra seriegegevens zijn nu niet beschikbaar.')}</p></div>`;
+    }
+  }
 }
 
 function renderQueue() {
@@ -166,32 +225,18 @@ async function searchShows(event) {
 async function addShow(id) {
   const show = results.find((item) => String(item.id) === String(id));
   if (!show || queue.some((item) => Number(item.tmdb_id) === Number(show.id))) return;
-  const seriesName = show.name || show.original_name || '';
+    const seriesName = show.name || show.original_name || '';
   const tvdb = tvdbSeriesUrl(seriesName);
   let tmdbInfo = null;
-  try {
-    const url = new URL(`${API_ROOT}/tv/${show.id}`);
-    url.searchParams.set('api_key', getKey());
-    url.searchParams.set('language', 'nl-NL');
-    const response = await fetch(url);
-    if (response.ok) {
-      const details = await response.json();
-      tmdbInfo = {
-        status: details.status,
-        in_production: details.in_production,
-        last_air_date: details.last_air_date,
-        next_episode_to_air: details.next_episode_to_air,
-        seasons: (details.seasons || []).map(({ season_number }) => ({ season_number })),
-      };
-    }
-  } catch { /* Folder setup can use the default ongoing-series template. */ }
+  try { tmdbInfo = compactTmdbInfo(await getTvDetails(show.id)); }
+  catch { /* Folder setup can use the default ongoing-series template. */ }
   queue.push({
     serie: seriesName,
     start_jaar: show.first_air_date?.slice(0, 4) || '',
     image_path: '',
     poster_path: show.poster_path || '',
     tvdb,
-    status: isEndedSeries(tmdbInfo) ? '2' : '0',
+    status: '4',
     next_air_date: 'Nog niet bekend',
     tmdb_id: show.id,
     tmdb_info: tmdbInfo,
@@ -220,24 +265,13 @@ async function refreshQueuedTmdbStatus() {
   if (!key) return;
   for (const show of queue) {
     if (!show.tmdb_id || show.tmdb_info) {
-      if (isEndedSeries(show.tmdb_info)) show.status = '2';
+      if (isEndedSeries(show.tmdb_info) && show.status !== '4') show.status = '2';
       continue;
     }
     try {
-      const url = new URL(`${API_ROOT}/tv/${show.tmdb_id}`);
-      url.searchParams.set('api_key', key);
-      url.searchParams.set('language', 'nl-NL');
-      const response = await fetch(url);
-      if (!response.ok) continue;
-      const details = await response.json();
-      show.tmdb_info = {
-        status: details.status,
-        in_production: details.in_production,
-        last_air_date: details.last_air_date,
-        next_episode_to_air: details.next_episode_to_air,
-        seasons: (details.seasons || []).map(({ season_number }) => ({ season_number })),
-      };
-      if (isEndedSeries(show.tmdb_info)) show.status = '2';
+      const details = await getTvDetails(show.tmdb_id);
+      show.tmdb_info = compactTmdbInfo(details);
+      if (isEndedSeries(show.tmdb_info) && show.status !== '4') show.status = '2';
     } catch { /* Keep the saved status if TMDB is unavailable. */ }
   }
   localStorage.setItem(QUEUE_STORAGE, JSON.stringify(queue));
@@ -397,6 +431,15 @@ function closeSettings() {
 }
 
 ui.searchForm.addEventListener('submit', searchShows);
+ui.closeDetailButton.addEventListener('click', () => ui.detailDialog.close());
+ui.detailDialog.addEventListener('close', () => { activeDetailId = null; });
+ui.detailAddButton.addEventListener('click', async () => {
+  if (!activeDetailId || ui.detailAddButton.disabled) return;
+  const id = activeDetailId;
+  await addShow(id);
+  ui.detailAddButton.disabled = true;
+  ui.detailAddButton.textContent = 'Op lijst';
+});
 ui.settingsButton.addEventListener('click', () => ui.settingsPanel.hidden ? openSettings() : closeSettings());
 ui.closeSettings.addEventListener('click', closeSettings);
 ui.saveKeyButton.addEventListener('click', () => {
